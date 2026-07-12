@@ -87,28 +87,13 @@ setup_build() {
     # Debug: dump config structure
     info "=== config/ contents ==="
     ls -la "${BUILD_DIR}/config/"
-    info "=== config/LB_* files ==="
-    ls "${BUILD_DIR}/config/LB_"* 2>/dev/null && for f in "${BUILD_DIR}/config/LB_"*; do echo "  $f = $(cat "$f")"; done || echo "No LB_* files"
-    info "=== binary dirs ==="
-    ls -d "${BUILD_DIR}"/config/binary* 2>/dev/null || echo "No binary dirs"
-
-    # Find live-build's main script to understand its library path
-    LB_BIN=$(which lb 2>/dev/null || echo "/usr/bin/lb")
-    info "lb binary: ${LB_BIN}"
-    head -5 "${LB_BIN}" 2>/dev/null || true
-    # Find the library directory from the lb script
-    LB_LIB=$(grep -oP 'LIB_DIR="\K[^"]+' "${LB_BIN}" 2>/dev/null || \
-             grep -oP 'LIBDIR="\K[^"]+' "${LB_BIN}" 2>/dev/null || \
-             grep -oP 'share/live/build' "${LB_BIN}" 2>/dev/null || true)
-    info "Live-build lib hint: ${LB_LIB}"
-    # Try common locations
-    for d in /usr/lib/live/build /usr/share/live/build /usr/share/perl5/live; do
-        if [ -d "$d" ]; then
-            info "Found live-build scripts in: $d"
-            ls "$d/" | head -20
-            grep -rl 'binary_syslinux\|syslinux' "$d/" 2>/dev/null | head -10
-        fi
-    done
+    info "=== config/binary file ==="
+    cat "${BUILD_DIR}/config/binary" 2>/dev/null || echo "No config/binary file"
+    info "=== config/binary_syslinux ==="
+    cat "${BUILD_DIR}/config/binary_syslinux" 2>/dev/null || echo "(empty/missing)"
+    ls -la "${BUILD_DIR}/config/binary_syslinux" 2>/dev/null || true
+    info "=== lb_binary script ==="
+    cat /usr/lib/live/build/lb_binary 2>/dev/null || echo "Script not found"
     info "=== END DEBUG ==="
 
     # Disable syslinux: remove directory + set LB_BOOTLOADERS
@@ -120,13 +105,13 @@ setup_build() {
     # Also set in config/common as backup
     echo 'LB_BOOTLOADERS="grub-efi"' >> "${BUILD_DIR}/config/common"
 
-    # Nuclear option: find and patch any live-build script that calls lb_binary_syslinux
-    dpkg -L live-build 2>/dev/null | while read script; do
-        if [ -f "$script" ] && grep -q 'lb_binary_syslinux' "$script" 2>/dev/null; then
-            info "Patching: $script"
-            sed -i 's/lb_binary_syslinux/lb_binary_syslinux_disabled/' "$script"
+    # Nuclear option: patch the lb_binary script directly to skip syslinux
+    if [ -f /usr/lib/live/build/lb_binary ]; then
+        if grep -q 'lb_binary_syslinux' /usr/lib/live/build/lb_binary; then
+            info "Patching /usr/lib/live/build/lb_binary to disable syslinux"
+            sed -i 's/lb_binary_syslinux/lb_binary_syslinux_disabled/' /usr/lib/live/build/lb_binary
         fi
-    done
+    fi
 }
 
 # Apply custom configuration
