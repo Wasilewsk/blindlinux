@@ -86,64 +86,46 @@ setup_build() {
 
     ok "live-build configured."
 
-    # Fix: Ubuntu 26.04 resolute lacks gfxboot-theme-ubuntu and syslinux themes.
-    # live-build 3.0~a57 always runs lb_binary_syslinux regardless of config.
-    # Solution: create dummy .deb packages and add as local apt repo.
+    # ── Fix: Ubuntu 26.04 resolute lacks gfxboot-theme-ubuntu / syslinux-themes-ubuntu-oneiric.
+    # live-build 3.0~a57 always runs lb_binary_syslinux regardless of LB_BOOTLOADERS.
+    # Solution: create dummy .deb packages, embed them inside the chroot via includes,
+    # and register a local file:// apt repo so the binary stage finds them.
 
     info "Creating dummy packages for syslinux dependencies..."
 
-    DUMMY_REPO="${BUILD_DIR}/dummy-repo"
-    mkdir -p "${DUMMY_REPO}"
+    DUMMY_REPO_IN_CHROOT="/var/local/blinbuntu-dummy-repo"
+    DUMMY_REPO_ON_HOST="${BUILD_DIR}/config/includes.chroot${DUMMY_REPO_IN_CHROOT}"
+    mkdir -p "${DUMMY_REPO_ON_HOST}"
 
     WORK=$(mktemp -d)
 
-    # Create dummy gfxboot-theme-ubuntu
-    cat > "${WORK}/gfxboot-theme-ubuntu.cfg" << 'EOF'
+    for PKG in gfxboot-theme-ubuntu syslinux-themes-ubuntu-oneiric; do
+        cat > "${WORK}/${PKG}.cfg" << PKGEOF
 Section: utils
 Priority: optional
 Standards-Version: 3.9.2
-Package: gfxboot-theme-ubuntu
+Package: ${PKG}
 Version: 42
 Depends: adduser
-Description: Dummy gfxboot-theme-ubuntu for Blinbuntu live-build
-EOF
+Description: Dummy ${PKG} for Blinbuntu live-build
+PKGEOF
+        cd "${WORK}"
+        equivs-build "${PKG}.cfg"
+        cp "${WORK}/${PKG}"*.deb "${DUMMY_REPO_ON_HOST}/"
+    done
 
-    # Create dummy syslinux-themes-ubuntu-oneiric
-    cat > "${WORK}/syslinux-themes-ubuntu-oneiric.cfg" << 'EOF'
-Section: utils
-Priority: optional
-Standards-Version: 3.9.2
-Package: syslinux-themes-ubuntu-oneiric
-Version: 42
-Depends: syslinux-common
-Description: Dummy syslinux-themes-ubuntu-oneiric for Blinbuntu live-build
-EOF
-
-    cd "${WORK}"
-    equivs-build gfxboot-theme-ubuntu.cfg 2>/dev/null || true
-    equivs-build syslinux-themes-ubuntu-oneiric.cfg 2>/dev/null || true
-
-    cp "${WORK}"/*.deb "${DUMMY_REPO}/" 2>/dev/null || true
-
-    # Create Packages.gz for local repo
-    cd "${DUMMY_REPO}"
-    dpkg-scanpackages . /dev/null 2>/dev/null | gzip -9 > Packages.gz 2>/dev/null || true
-
+    cd "${DUMMY_REPO_ON_HOST}"
+    dpkg-scanpackages . /dev/null | gzip -9 > Packages.gz
     rm -rf "${WORK}"
 
-    # Add local repo to build's apt sources
+    ok "Dummy repo built with $(ls *.deb | wc -l) packages."
+
+    # Register the local repo inside the chroot (both chroot and binary stages)
     mkdir -p "${BUILD_DIR}/config/archives"
-    cat > "${BUILD_DIR}/config/archives/dummy-syslinux.list.chroot" << ARCHIVE
-deb [trusted=yes] file:${DUMMY_REPO} ./
-ARCHIVE
-
-    # Also add for binary stage
-    cat > "${BUILD_DIR}/config/archives/dummy-syslinux.list.binary" << ARCHIVE
-deb [trusted=yes] file:${DUMMY_REPO} ./
-ARCHIVE
-
-    info "Dummy repo created at ${DUMMY_REPO}"
-    ls -la "${DUMMY_REPO}/"
+    echo "deb [trusted=yes] file://${DUMMY_REPO_IN_CHROOT} ./" \
+        > "${BUILD_DIR}/config/archives/blinbuntu-dummy-syslinux.list.chroot"
+    echo "deb [trusted=yes] file://${DUMMY_REPO_IN_CHROOT} ./" \
+        > "${BUILD_DIR}/config/archives/blinbuntu-dummy-syslinux.list.binary"
 }
 
 # Apply custom configuration

@@ -37,25 +37,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            live-build \
-            debootstrap \
-            squashfs-tools \
-            xorriso \
-            isolinux \
-            syslinux-efi \
-            grub-efi-amd64-bin \
-            grub-pc-bin \
-            mtools \
-            dosfstools \
-            parted
-
-      - name: Configure live-build
-        run: sudo ./build.sh config
-
       - name: Build ISO
         run: sudo ./build.sh build
 
