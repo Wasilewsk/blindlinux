@@ -43,14 +43,19 @@ jobs:
       - name: Get ISO filename
         id: iso
         run: |
-          ISO_FILE=$(find . -name "*.iso" -type f | head -1)
+          ISO_FILE=$(find ./build -path ./build/chroot -prune -o -name "*.iso" -type f -print | head -1)
+          if [ -z "${ISO_FILE}" ]; then
+            ISO_FILE=$(find . -path ./build/chroot -prune -o -name "*.iso" -type f -print | head -1)
+          fi
+          echo "ISO found: ${ISO_FILE}"
           echo "path=${ISO_FILE}" >> "$GITHUB_OUTPUT"
           echo "filename=$(basename "${ISO_FILE}")" >> "$GITHUB_OUTPUT"
 
       - name: Generate checksums
         run: |
-          cd "$(dirname "${{ steps.iso.outputs.path }}")"
-          sha256sum "$(basename "${{ steps.iso.outputs.path }}")" > "$(basename "${{ steps.iso.outputs.path }}").sha256"
+          ISO_PATH="${{ steps.iso.outputs.path }}"
+          cd "$(dirname "${ISO_PATH}")"
+          sha256sum "$(basename "${ISO_PATH}")" > "$(basename "${ISO_PATH}").sha256"
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4

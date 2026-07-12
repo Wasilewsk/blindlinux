@@ -323,8 +323,12 @@ build_iso() {
     LB_BOOTLOADERS="grub-efi" lb build 2>&1 | tee "${SCRIPT_DIR}/build.log"
     ok "Build complete."
 
-    # Find the generated ISO
-    ISO_FILE=$(find "${BUILD_DIR}" -name "*.iso" -type f | head -1)
+    # Find the generated ISO (exclude chroot which may contain memtest86+ ISO)
+    ISO_FILE=$(find "${BUILD_DIR}" -path "${BUILD_DIR}/chroot" -prune -o -name "*.iso" -type f -print | head -1)
+    if [ -z "${ISO_FILE}" ]; then
+        # Fallback: look for common live-build ISO names
+        ISO_FILE=$(find "${BUILD_DIR}" -path "${BUILD_DIR}/chroot" -prune -o \( -name "image-*.iso" -o -name "live-image-*.iso" -o -name "blinbuntu*.iso" \) -type f -print | head -1)
+    fi
     if [ -n "${ISO_FILE}" ]; then
         ok "ISO created: ${ISO_FILE}"
         cp "${ISO_FILE}" "${SCRIPT_DIR}/" 2>/dev/null || true
