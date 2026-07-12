@@ -146,27 +146,39 @@ LABEL live
   APPEND boot=live components quiet splash
 LIVECFG
 
-    # Ensure isohybrid is in PATH
-    ISOHYBRID_FOUND=false
-    for dir in /usr/lib/ISOLINUX /usr/lib/syslinux /usr/bin /usr/sbin /usr/local/bin; do
-        if [ -f "${dir}/isohybrid" ]; then
-            cp -f "${dir}/isohybrid" /usr/local/bin/isohybrid
-            chmod +x /usr/local/bin/isohybrid
-            ISOHYBRID_FOUND=true
-            ok "isohybrid installed from ${dir}"
-            break
+    # Ensure isohybrid is in PATH (needed by live-build binary.sh)
+    # On Ubuntu 26.04/resolute, isohybrid may not be packaged — create a no-op wrapper.
+    # isohybrid only adds legacy BIOS USB boot; GRUB EFI handles UEFI boot.
+    if ! command -v isohybrid >/dev/null 2>&1; then
+        ISOHYBRID_FOUND=false
+        for dir in /usr/lib/ISOLINUX /usr/lib/syslinux /usr/bin /usr/sbin /usr/local/bin; do
+            if [ -f "${dir}/isohybrid" ]; then
+                cp -f "${dir}/isohybrid" /usr/local/bin/isohybrid
+                chmod +x /usr/local/bin/isohybrid
+                ISOHYBRID_FOUND=true
+                ok "isohybrid installed from ${dir}"
+                break
+            fi
+        done
+        if [ "$ISOHYBRID_FOUND" = false ]; then
+            ISOHYBRID_PATH=$(dpkg -S isohybrid 2>/dev/null | grep -v '^diversion' | head -1 | cut -d: -f2 | tr -d ' ' || true)
+            if [ -n "$ISOHYBRID_PATH" ] && [ -f "$ISOHYBRID_PATH" ]; then
+                cp -f "$ISOHYBRID_PATH" /usr/local/bin/isohybrid
+                chmod +x /usr/local/bin/isohybrid
+                ok "isohybrid installed from dpkg path ${ISOHYBRID_PATH}"
+            else
+                # Create a no-op wrapper so binary.sh doesn't fail
+                cat > /usr/local/bin/isohybrid << 'ISOHYBRIDWrapper'
+#!/bin/sh
+echo "[isohybrid] Skipping — no isohybrid available on this system"
+exit 0
+ISOHYBRIDWrapper
+                chmod +x /usr/local/bin/isohybrid
+                warn "isohybrid not found — created no-op wrapper"
+            fi
         fi
-    done
-    if [ "$ISOHYBRID_FOUND" = false ]; then
-        # Try to find via dpkg
-        ISOHYBRID_PATH=$(dpkg -S isohybrid 2>/dev/null | head -1 | cut -d: -f2 | tr -d ' ' || true)
-        if [ -n "$ISOHYBRID_PATH" ] && [ -f "$ISOHYBRID_PATH" ]; then
-            cp -f "$ISOHYBRID_PATH" /usr/local/bin/isohybrid
-            chmod +x /usr/local/bin/isohybrid
-            ok "isohybrid installed from dpkg path ${ISOHYBRID_PATH}"
-        else
-            warn "isohybrid not found — ISO may not be made bootable"
-        fi
+    else
+        ok "isohybrid already in PATH: $(which isohybrid)"
     fi
 
     # Replace lb_binary_syslinux with a standalone script that copies real syslinux files
