@@ -80,8 +80,7 @@ setup_build() {
         --apt-recommends true \
         --memtest none \
         --security true \
-        --backports false \
-        --debian-installer live
+        --backports false
 
     ok "live-build configured."
 }
