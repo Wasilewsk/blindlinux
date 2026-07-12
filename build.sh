@@ -84,24 +84,13 @@ setup_build() {
 
     ok "live-build configured."
 
-    # Debug: show config/common bootloader setting
-    info "Current bootloader config:"
-    cat "${BUILD_DIR}/config/common" 2>/dev/null | grep -i bootloader || echo "(not found)"
-
-    # Override bootloader to grub-efi only
-    # live-build on Ubuntu may use different config formats
-    if [ -f "${BUILD_DIR}/config/common" ]; then
-        # Remove any LB_BOOTLOADERS line and add our own
-        grep -v '^LB_BOOTLOADERS' "${BUILD_DIR}/config/common" > "${BUILD_DIR}/config/common.tmp" 2>/dev/null || true
-        echo 'LB_BOOTLOADERS="grub-efi"' >> "${BUILD_DIR}/config/common.tmp"
-        mv "${BUILD_DIR}/config/common.tmp" "${BUILD_DIR}/config/common"
-    fi
-
-    # Also write standalone config files (live-build checks these)
-    mkdir -p "${BUILD_DIR}/config/bootloaders"
-    rm -rf "${BUILD_DIR}/config/bootloaders"
-    mkdir -p "${BUILD_DIR}/config/bootloaders"
-    echo "grub-efi" > "${BUILD_DIR}/config/bootloaders.list"
+    # Debug: dump config directory structure and common file
+    info "Config directory contents:"
+    ls -la "${BUILD_DIR}/config/" 2>/dev/null || true
+    info "config/common content (first 50 lines):"
+    head -50 "${BUILD_DIR}/config/common" 2>/dev/null || echo "config/common does not exist"
+    info "config/bootloaders content:"
+    cat "${BUILD_DIR}/config/bootloaders" 2>/dev/null || echo "config/bootloaders does not exist"
 }
 
 # Apply custom configuration
