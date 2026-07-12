@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Blinbuntu Software
+Comment=Install optional software packages
+Exec=/usr/bin/blinbuntu-select-packages
+Icon=system-software-install
+Terminal=false
+Categories=System;Utility;
+Keywords=software;install;packages;
+StartupNotify=true

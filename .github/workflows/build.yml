@@ -1,0 +1,100 @@
+name: Build Blinbuntu ISO
+
+on:
+  push:
+    branches: [main, master]
+    tags: ['v*']
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      ubuntu_codename:
+        description: 'Ubuntu codename (e.g. resolute, noble, jammy)'
+        required: false
+        default: 'resolute'
+      distro_version:
+        description: 'Distro version'
+        required: false
+        default: '26.04'
+      architecture:
+        description: 'Target architecture'
+        required: false
+        default: 'amd64'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    permissions:
+      contents: write
+
+    env:
+      UBUNTU_CODENAME: ${{ github.event.inputs.ubuntu_codename || 'resolute' }}
+      DISTRO_VERSION: ${{ github.event.inputs.distro_version || '26.04' }}
+      ARCHITECTURE: ${{ github.event.inputs.architecture || 'amd64' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            live-build \
+            debootstrap \
+            squashfs-tools \
+            xorriso \
+            isolinux \
+            syslinux-efi \
+            grub-efi-amd64-bin \
+            grub-pc-bin \
+            mtools \
+            dosfstools \
+            parted
+
+      - name: Configure live-build
+        run: sudo ./build.sh config
+
+      - name: Build ISO
+        run: sudo ./build.sh build
+
+      - name: Get ISO filename
+        id: iso
+        run: |
+          ISO_FILE=$(find . -name "*.iso" -type f | head -1)
+          echo "path=${ISO_FILE}" >> "$GITHUB_OUTPUT"
+          echo "filename=$(basename "${ISO_FILE}")" >> "$GITHUB_OUTPUT"
+
+      - name: Generate checksums
+        run: |
+          cd "$(dirname "${{ steps.iso.outputs.path }}")"
+          sha256sum "$(basename "${{ steps.iso.outputs.path }}")" > "$(basename "${{ steps.iso.outputs.path }}").sha256"
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: blinbuntu-${{ env.DISTRO_VERSION }}-${{ env.ARCHITECTURE }}
+          path: |
+            ${{ steps.iso.outputs.path }}
+            ${{ steps.iso.outputs.path }}.sha256
+          retention-days: 30
+
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.iso.outputs.path }}
+            ${{ steps.iso.outputs.path }}.sha256
+          draft: true
+          generate_release_notes: true
+
+  clean:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Clean build artifacts
+        run: sudo ./build.sh clean
