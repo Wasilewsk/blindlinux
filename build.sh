@@ -85,68 +85,43 @@ setup_build() {
     ok "live-build configured."
 
     # Ubuntu 26.04 resolute lacks gfxboot-theme-ubuntu and syslinux-themes-ubuntu-oneiric.
-    # The original lb_binary_syslinux uses ${LB_SYSLINUX_THEME} which defaults to
-    # ubuntu-oneiric — not available. Replace the script with a simplified version
-    # that just installs syslinux and copies basic isolinux files for genisoimage.
+    # Replace lb_binary_syslinux with a standalone script that installs syslinux
+    # and copies basic isolinux files — no theme/gfxboot dependencies.
     info "Replacing lb_binary_syslinux with resolute-compatible version..."
-    cat > /usr/lib/live/build/lb_binary_syslinux << 'SYSLINUX_EOF'
+    cat > /usr/lib/live/build/lb_binary_syslinux << 'ENDOFSYSLINUX'
 #!/bin/sh
+set -e
 
-. "${LB_BASE:-/usr/lib/live/build}"/scripts/build.sh
-
-DESCRIPTION="$(Echo 'installs syslinux into binary')"
-HELP=""
-USAGE="${PROGRAM} [--force]"
-
-Arguments "${@}"
-
-Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
-Set_defaults
-
-Echo_message "Begin installing syslinux (resolute-compatible)..."
-
-Require_stagefile .stage/config .stage/bootstrap
-Check_stagefile .stage/binary_syslinux
-Check_lockfile .lock
-Create_lockfile .lock
-
+_SUFFIX="binary/isolinux"
 case "${LB_BINARY_IMAGES}" in
-    iso*)
-        _BOOTLOADER="isolinux"
-        _SUFFIX="binary/isolinux"
-        ;;
-    net*)
-        _BOOTLOADER="pxelinux"
-        _SUFFIX="tftpboot"
-        ;;
-    hdd*|*)
-        _BOOTLOADER="syslinux"
-        _SUFFIX="binary/syslinux"
-        ;;
+    iso*)  _BOOTLOADER="isolinux"; _SUFFIX="binary/isolinux" ;;
+    net*)  _BOOTLOADER="pxelinux"; _SUFFIX="tftpboot" ;;
+    hdd*|*) _BOOTLOADER="syslinux"; _SUFFIX="binary/syslinux" ;;
 esac
 
-case "${LB_BUILD_WITH_CHROOT}" in
-    true)
-        Check_package chroot/usr/bin/syslinux syslinux
+# Install syslinux into the chroot
+if [ "${LB_BUILD_WITH_CHROOT}" = "true" ]; then
+    chroot chroot apt-get install -y --no-install-recommends syslinux 2>/dev/null || \
+    chroot chroot apt-get install -y syslinux 2>/dev/null || true
+fi
 
-        Restore_cache cache/packages_binary
-        Install_package
+mkdir -p ${_SUFFIX}
 
-        mkdir -p ${_SUFFIX}
+# Copy basic isolinux files from the chroot
+for f in isolinux.bin ldlinux.c32 libcom32.c32 libutil.c32 \
+         menu.c32 reboot.c32 poweroff.c32 chain.c32; do
+    if [ "${LB_BUILD_WITH_CHROOT}" = "true" ]; then
+        cp "chroot/usr/lib/ISOLINUX/${f}" ${_SUFFIX}/ 2>/dev/null || \
+        cp "chroot/usr/lib/syslinux/${f}" ${_SUFFIX}/ 2>/dev/null || \
+        cp "chroot/usr/lib/syslinux/bios/${f}" ${_SUFFIX}/ 2>/dev/null || true
+    else
+        cp "/usr/lib/ISOLINUX/${f}" ${_SUFFIX}/ 2>/dev/null || \
+        cp "/usr/lib/syslinux/${f}" ${_SUFFIX}/ 2>/dev/null || true
+    fi
+done
 
-        for f in isolinux.bin ldlinux.c32 libcom32.c32 libutil.c32 \
-                 menu.c32 reboot.c32 poweroff.c32 chain.c32; do
-            src="chroot/usr/lib/ISOLINUX/${f}"
-            if [ -e "${src}" ] 2>/dev/null; then
-                cp "${src}" ${_SUFFIX}/ 2>/dev/null || true
-            fi
-        done
-
-        if [ -f chroot/usr/lib/syslinux/modules/bios/ldlinux.c32 ]; then
-            cp chroot/usr/lib/syslinux/modules/bios/ldlinux.c32 ${_SUFFIX}/ 2>/dev/null || true
-        fi
-
-        cat > ${_SUFFIX}/live.cfg << 'LIVECFG'
+# Minimal boot config
+cat > ${_SUFFIX}/live.cfg << 'LIVECFG'
 DEFAULT live
 MENU LABEL ^Live
 LABEL live
@@ -155,23 +130,7 @@ LABEL live
   INITRD /live/initrd
   APPEND boot=live components quiet splash
 LIVECFG
-
-        Save_cache cache/packages_binary
-        Remove_package
-        ;;
-
-    false)
-        mkdir -p ${_SUFFIX}
-        ;;
-esac
-
-if [ -e ${_SUFFIX}/live.cfg ]; then
-    sed -i -e "s|@LB_BOOTAPPEND_LIVE@|${LB_BOOTAPPEND_LIVE}|g" \
-        ${_SUFFIX}/live.cfg
-fi
-
-Create_stagefile .stage/binary_syslinux
-SYSLINUX_EOF
+ENDOFSYSLINUX
     chmod +x /usr/lib/live/build/lb_binary_syslinux
 
     # Also set LB_BOOTLOADERS
