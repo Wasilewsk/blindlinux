@@ -78,8 +78,6 @@ setup_build() {
         --iso-volume "${DISTRO_NAME} ${DISTRO_VERSION}" \
         --apt-indices false \
         --apt-recommends true \
-        --firmware-binary true \
-        --firmware-chroot true \
         --memtest none \
         --security true \
         --backports false \
