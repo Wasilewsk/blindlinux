@@ -85,7 +85,12 @@ setup_build() {
     ok "live-build configured."
 
     # Override bootloader to grub-efi only (syslinux themes unavailable in resolute)
-    sed -i 's|^LB_BOOTLOADERS=.*|LB_BOOTLOADERS="grub-efi"|' "${BUILD_DIR}/config/common"
+    grep -q 'LB_BOOTLOADERS' "${BUILD_DIR}/config/common" 2>/dev/null && \
+        sed -i 's/^LB_BOOTLOADERS=.*/LB_BOOTLOADERS="grub-efi"/' "${BUILD_DIR}/config/common" || \
+        echo 'LB_BOOTLOADERS="grub-efi"' >> "${BUILD_DIR}/config/common"
+
+    # Remove syslinux binary hooks to prevent syslinux build
+    rm -f "${BUILD_DIR}/config/hooks/binary"*syslinux* 2>/dev/null || true
 }
 
 # Apply custom configuration
