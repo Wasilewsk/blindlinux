@@ -92,7 +92,7 @@ setup_build() {
     cat > /usr/lib/live/build/lb_binary_syslinux << 'SYSLINUX_EOF'
 #!/bin/sh
 
-. "${LB_BASE:-/usr/share/live/build}"/scripts/build.sh
+. "${LB_BASE:-/usr/lib/live/build}"/scripts/build.sh
 
 DESCRIPTION="$(Echo 'installs syslinux into binary')"
 HELP=""
