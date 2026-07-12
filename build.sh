@@ -85,18 +85,100 @@ setup_build() {
     ok "live-build configured."
 
     # Ubuntu 26.04 resolute lacks gfxboot-theme-ubuntu and syslinux-themes-ubuntu-oneiric.
-    # Patch lb_binary_syslinux to remove those package names from its apt install,
-    # while keeping the rest of the syslinux setup intact.
-    info "Patching lb_binary_syslinux to remove unavailable packages..."
-    if [ -f /usr/lib/live/build/lb_binary_syslinux ]; then
-        # Remove the two missing packages from any apt/dpkg install lines
-        sed -i 's/ gfxboot-theme-ubuntu//g; s/ syslinux-themes-ubuntu-oneiric//g' \
-            /usr/lib/live/build/lb_binary_syslinux
-        sed -i 's/gfxboot-theme-ubuntu //g; s/syslinux-themes-ubuntu-oneiric //g' \
-            /usr/lib/live/build/lb_binary_syslinux
-        sed -i 's/gfxboot-theme-ubuntu//g; s/syslinux-themes-ubuntu-oneiric//g' \
-            /usr/lib/live/build/lb_binary_syslinux
-    fi
+    # The original lb_binary_syslinux uses ${LB_SYSLINUX_THEME} which defaults to
+    # ubuntu-oneiric — not available. Replace the script with a simplified version
+    # that just installs syslinux and copies basic isolinux files for genisoimage.
+    info "Replacing lb_binary_syslinux with resolute-compatible version..."
+    cat > /usr/lib/live/build/lb_binary_syslinux << 'SYSLINUX_EOF'
+#!/bin/sh
+
+. "${LB_BASE:-/usr/share/live/build}"/scripts/build.sh
+
+DESCRIPTION="$(Echo 'installs syslinux into binary')"
+HELP=""
+USAGE="${PROGRAM} [--force]"
+
+Arguments "${@}"
+
+Read_conffiles config/all config/common config/bootstrap config/chroot config/binary config/source
+Set_defaults
+
+if [ "${LB_BOOTLOADER}" != "syslinux" ]; then
+    exit 0
+fi
+
+Echo_message "Begin installing syslinux..."
+
+Require_stagefile .stage/config .stage/bootstrap
+Check_stagefile .stage/binary_syslinux
+Check_lockfile .lock
+Create_lockfile .lock
+
+case "${LB_BINARY_IMAGES}" in
+    iso*)
+        _BOOTLOADER="isolinux"
+        _SUFFIX="binary/isolinux"
+        ;;
+    net*)
+        _BOOTLOADER="pxelinux"
+        _SUFFIX="tftpboot"
+        ;;
+    hdd*|*)
+        _BOOTLOADER="syslinux"
+        _SUFFIX="binary/syslinux"
+        ;;
+esac
+
+case "${LB_BUILD_WITH_CHROOT}" in
+    true)
+        Check_package chroot/usr/bin/syslinux syslinux
+
+        Restore_cache cache/packages_binary
+        Install_package
+
+        mkdir -p ${_SUFFIX}
+
+        for f in isolinux.bin ldlinux.c32 libcom32.c32 libutil.c32 \
+                 menu.c32 reboot.c32 poweroff.c32 chain.c32; do
+            src="chroot/usr/lib/ISOLINUX/${f}"
+            if [ -e "${src}" ] 2>/dev/null; then
+                cp "${src}" ${_SUFFIX}/ 2>/dev/null || true
+            fi
+        done
+
+        if [ -f chroot/usr/lib/syslinux/modules/bios/ldlinux.c32 ]; then
+            cp chroot/usr/lib/syslinux/modules/bios/ldlinux.c32 ${_SUFFIX}/ 2>/dev/null || true
+        fi
+
+        cat > ${_SUFFIX}/live.cfg << 'LIVECFG'
+DEFAULT live
+MENU LABEL ^Live
+MENU BACKGROUND f390b6d82d824b58a244952d1f80e58b.png
+MENU COLOR sel 7;36;40
+LABEL live
+  MENU LABEL ^Live - Try Ubuntu without installing
+  LINUX /live/vmlinuz
+  INITRD /live/initrd
+  APPEND boot=live components quiet splash
+LIVECFG
+
+        Save_cache cache/packages_binary
+        Remove_package
+        ;;
+
+    false)
+        mkdir -p ${_SUFFIX}
+        ;;
+esac
+
+if [ -e ${_SUFFIX}/live.cfg ]; then
+    sed -i -e "s|@LB_BOOTAPPEND_LIVE@|${LB_BOOTAPPEND_LIVE}|g" \
+        ${_SUFFIX}/live.cfg
+fi
+
+Create_stagefile .stage/binary_syslinux
+SYSLINUX_EOF
+    chmod +x /usr/lib/live/build/lb_binary_syslinux
 
     # Also set LB_BOOTLOADERS
     echo 'LB_BOOTLOADERS="grub-efi"' >> "${BUILD_DIR}/config/binary"
