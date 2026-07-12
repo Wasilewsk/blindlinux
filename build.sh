@@ -84,26 +84,42 @@ setup_build() {
 
     ok "live-build configured."
 
-    # Disable syslinux: remove directory + set LB_BOOTLOADERS
-    info "Disabling syslinux bootloader (GRUB EFI only)..."
+    # Disable syslinux binary step (gfxboot-theme-ubuntu and
+    # syslinux-themes-ubuntu-oneiric don't exist in Ubuntu 26.04 resolute)
+    info "Disabling syslinux binary step..."
     rm -rf "${BUILD_DIR}/config/binary_syslinux"
 
-    # Nuclear option: overwrite lb_binary_syslinux with a no-op
+    # Overwrite lb_binary_syslinux with a no-op
     for script in /usr/lib/live/build/lb_binary_syslinux; do
         if [ -f "$script" ]; then
             info "Replacing $script with no-op"
-            cp "$script" "${script}.bak"
             printf '#!/bin/sh\nexit 0\n' > "$script"
             chmod +x "$script"
         fi
     done
 
-    # iso-hybrid requires isolinux/syslinux. Since we only use GRUB EFI,
-    # switch to plain iso and inject GRUB EFI boot via config.
-    sed -i 's/LB_BINARY_IMAGES="iso-hybrid"/LB_BINARY_IMAGES="iso"/' "${BUILD_DIR}/config/binary"
-    sed -i 's/LB_BINARY_FILESYSTEM="fat16"/LB_BINARY_FILESYSTEM="fat32"/' "${BUILD_DIR}/config/binary"
+    # genisoimage needs an isolinux/ directory in the binary staging area.
+    # Create a minimal one from the syslinux package files on the host.
+    mkdir -p "${BUILD_DIR}/config/includes.binary/isolinux"
+    for f in isolinux.bin ldlinux.c32 libcom32.c32 libutil.c32 \
+             menu.c32 reboot.c32 poweroff.c32; do
+        src=$(find /usr/lib/ISOLINUX /usr/lib/syslinux /usr/lib/syslinux/bios \
+              -name "$f" 2>/dev/null | head -1)
+        if [ -n "$src" ]; then
+            cp "$src" "${BUILD_DIR}/config/includes.binary/isolinux/"
+        fi
+    done
+    cat > "${BUILD_DIR}/config/includes.binary/isolinux/isolinux.cfg" << 'ISOLINUX'
+DEFAULT live
+LABEL live
+    MENU LABEL Blinbuntu Live
+    LINUX /live/vmlinuz
+    INITRD /live/initrd
+    APPEND boot=live components
+ISOLINUX
+
+    # Also set LB_BOOTLOADERS
     echo 'LB_BOOTLOADERS="grub-efi"' >> "${BUILD_DIR}/config/binary"
-    echo 'LB_LINUX_FLAVOURS="generic"' >> "${BUILD_DIR}/config/binary"
 }
 
 # Apply custom configuration
