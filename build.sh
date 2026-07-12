@@ -84,24 +84,11 @@ setup_build() {
 
     ok "live-build configured."
 
-    # Debug: dump config structure
-    info "=== config/ contents ==="
-    ls -la "${BUILD_DIR}/config/"
-    info "=== config/binary file ==="
-    cat "${BUILD_DIR}/config/binary" 2>/dev/null || echo "No config/binary file"
-    info "=== config/binary_syslinux ==="
-    cat "${BUILD_DIR}/config/binary_syslinux" 2>/dev/null || echo "(empty/missing)"
-    ls -la "${BUILD_DIR}/config/binary_syslinux" 2>/dev/null || true
-    info "=== lb_binary script ==="
-    cat /usr/lib/live/build/lb_binary 2>/dev/null || echo "Script not found"
-    info "=== END DEBUG ==="
-
     # Disable syslinux: remove directory + set LB_BOOTLOADERS
     info "Disabling syslinux bootloader (GRUB EFI only)..."
     rm -rf "${BUILD_DIR}/config/binary_syslinux"
 
     # Nuclear option: overwrite lb_binary_syslinux with a no-op
-    # This way even if lb_binary calls it, it just exits 0
     for script in /usr/lib/live/build/lb_binary_syslinux; do
         if [ -f "$script" ]; then
             info "Replacing $script with no-op"
@@ -111,8 +98,12 @@ setup_build() {
         fi
     done
 
-    # Also set LB_BOOTLOADERS in config/binary (the actual binary stage config)
-    sed -i '1a LB_BOOTLOADERS="grub-efi"' "${BUILD_DIR}/config/binary"
+    # iso-hybrid requires isolinux/syslinux. Since we only use GRUB EFI,
+    # switch to plain iso and inject GRUB EFI boot via config.
+    sed -i 's/LB_BINARY_IMAGES="iso-hybrid"/LB_BINARY_IMAGES="iso"/' "${BUILD_DIR}/config/binary"
+    sed -i 's/LB_BINARY_FILESYSTEM="fat16"/LB_BINARY_FILESYSTEM="fat32"/' "${BUILD_DIR}/config/binary"
+    echo 'LB_BOOTLOADERS="grub-efi"' >> "${BUILD_DIR}/config/binary"
+    echo 'LB_LINUX_FLAVOURS="generic"' >> "${BUILD_DIR}/config/binary"
 }
 
 # Apply custom configuration
