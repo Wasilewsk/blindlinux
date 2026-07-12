@@ -85,36 +85,43 @@ setup_build() {
     ok "live-build configured."
 
     # Ubuntu 26.04 resolute lacks gfxboot-theme-ubuntu and syslinux-themes-ubuntu-oneiric.
-    # Replace lb_binary_syslinux with a standalone script that installs syslinux
-    # and copies basic isolinux files — no theme/gfxboot dependencies.
-    info "Replacing lb_binary_syslinux with resolute-compatible version..."
-    cat > /usr/lib/live/build/lb_binary_syslinux << 'ENDOFSYSLINUX'
-#!/bin/sh
-set -e
+    # The original lb_binary_syslinux script tries to install these packages and fails.
+    # Solution: pre-create binary/isolinux with real syslinux files from the host,
+    # and replace lb_binary_syslinux with a minimal no-op since the files are already there.
 
-_SUFFIX="binary/isolinux"
-case "${LB_BINARY_IMAGES}" in
-    iso*)  _BOOTLOADER="isolinux"; _SUFFIX="binary/isolinux" ;;
-    net*)  _BOOTLOADER="pxelinux"; _SUFFIX="tftpboot" ;;
-    hdd*|*) _BOOTLOADER="syslinux"; _SUFFIX="binary/syslinux" ;;
-esac
+    info "Pre-creating binary/isolinux with host syslinux files..."
+    mkdir -p "${BUILD_DIR}/binary/isolinux"
 
-mkdir -p ${_SUFFIX}
-
-# Copy isolinux files from host system (already installed as build dep)
-for f in isolinux.bin ldlinux.c32 libcom32.c32 libutil.c32 \
-         menu.c32 reboot.c32 poweroff.c32 chain.c32; do
-    for dir in /usr/lib/ISOLINUX /usr/lib/syslinux /usr/lib/syslinux/bios \
-               /usr/share/syslinux; do
-        if [ -f "${dir}/${f}" ]; then
-            cp -f "${dir}/${f}" ${_SUFFIX}/
+    # Find isolinux.bin from the host's isolinux package
+    for dir in /usr/lib/ISOLINUX /usr/lib/syslinux /usr/share/syslinux /usr/lib/syslinux/bios; do
+        if [ -f "${dir}/isolinux.bin" ]; then
+            cp -aL "${dir}/" "${BUILD_DIR}/binary/isolinux/"
+            ok "Copied syslinux files from ${dir}"
             break
         fi
     done
-done
 
-# Minimal boot config
-cat > ${_SUFFIX}/live.cfg << 'LIVECFG'
+    if [ ! -f "${BUILD_DIR}/binary/isolinux/isolinux.bin" ]; then
+        # Try dpkg to find the file
+        ISOLINUX_DIR=$(dpkg -L isolinux 2>/dev/null | grep -m1 '/ISOLINUX$' || true)
+        if [ -n "$ISOLINUX_DIR" ] && [ -d "$ISOLINUX_DIR" ]; then
+            cp -aL "${ISOLINUX_DIR}/" "${BUILD_DIR}/binary/isolinux/"
+            ok "Copied syslinux files from dpkg path ${ISOLINUX_DIR}"
+        fi
+    fi
+
+    # Also copy any .c32 module files from syslinux-common
+    for dir in /usr/lib/syslinux /usr/lib/syslinux/modules/bios /usr/share/syslinux; do
+        if [ -d "$dir" ]; then
+            cp -aL "${dir}"/*.c32 "${BUILD_DIR}/binary/isolinux/" 2>/dev/null || true
+            cp -aL "${dir}"/*.com "${BUILD_DIR}/binary/isolinux/" 2>/dev/null || true
+        fi
+    done
+
+    ls -la "${BUILD_DIR}/binary/isolinux/" || warn "binary/isolinux is empty!"
+
+    # Create minimal live.cfg for isolinux
+    cat > "${BUILD_DIR}/binary/isolinux/live.cfg" << 'LIVECFG'
 DEFAULT live
 MENU LABEL ^Live
 LABEL live
@@ -123,11 +130,21 @@ LABEL live
   INITRD /live/initrd
   APPEND boot=live components quiet splash
 LIVECFG
-ENDOFSYSLINUX
-    # Ensure isohybrid is in PATH (it's in /usr/lib/ISOLINUX/ on Ubuntu)
-    if [ -f /usr/lib/ISOLINUX/isohybrid ]; then
-        ln -sf /usr/lib/ISOLINUX/isohybrid /usr/local/bin/isohybrid 2>/dev/null || true
-    fi
+
+    # Ensure isohybrid is in PATH
+    for dir in /usr/lib/ISOLINUX /usr/lib/syslinux /usr/bin; do
+        if [ -f "${dir}/isohybrid" ]; then
+            ln -sf "${dir}/isohybrid" /usr/local/bin/isohybrid
+            break
+        fi
+    done
+
+    # Replace lb_binary_syslinux with a no-op since we pre-created the files
+    cat > /usr/lib/live/build/lb_binary_syslinux << 'NOOP'
+#!/bin/sh
+# Pre-created binary/isolinux in setup_build — skip this step
+exit 0
+NOOP
     chmod +x /usr/lib/live/build/lb_binary_syslinux
 
     # Also set LB_BOOTLOADERS
