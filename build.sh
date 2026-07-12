@@ -55,9 +55,7 @@ install_build_deps() {
         wget \
         curl \
         ca-certificates \
-        gnupg \
-        equivs \
-        dpkg-dev
+        gnupg
     ok "Build dependencies installed."
 }
 
@@ -86,46 +84,27 @@ setup_build() {
 
     ok "live-build configured."
 
-    # ── Fix: Ubuntu 26.04 resolute lacks gfxboot-theme-ubuntu / syslinux-themes-ubuntu-oneiric.
+    # Ubuntu 26.04 resolute lacks gfxboot-theme-ubuntu and syslinux-themes-ubuntu-oneiric.
     # live-build 3.0~a57 always runs lb_binary_syslinux regardless of LB_BOOTLOADERS.
-    # Solution: create dummy .deb packages, embed them inside the chroot via includes,
-    # and register a local file:// apt repo so the binary stage finds them.
-
-    info "Creating dummy packages for syslinux dependencies..."
-
-    DUMMY_REPO_IN_CHROOT="/var/local/blinbuntu-dummy-repo"
-    DUMMY_REPO_ON_HOST="${BUILD_DIR}/config/includes.chroot${DUMMY_REPO_IN_CHROOT}"
-    mkdir -p "${DUMMY_REPO_ON_HOST}"
-
-    WORK=$(mktemp -d)
-
-    for PKG in gfxboot-theme-ubuntu syslinux-themes-ubuntu-oneiric; do
-        cat > "${WORK}/${PKG}.cfg" << PKGEOF
-Section: utils
-Priority: optional
-Standards-Version: 3.9.2
-Package: ${PKG}
-Version: 42
-Depends: adduser
-Description: Dummy ${PKG} for Blinbuntu live-build
-PKGEOF
-        cd "${WORK}"
-        equivs-build "${PKG}.cfg"
-        cp "${WORK}/${PKG}"*.deb "${DUMMY_REPO_ON_HOST}/"
-    done
-
-    cd "${DUMMY_REPO_ON_HOST}"
-    dpkg-scanpackages . /dev/null | gzip -9 > Packages.gz
-    rm -rf "${WORK}"
-
-    ok "Dummy repo built with $(ls *.deb | wc -l) packages."
-
-    # Register the local repo inside the chroot (both chroot and binary stages)
+    # Add Ubuntu noble (24.04) as a fallback source so apt can find the real packages.
+    info "Adding Ubuntu noble fallback repo for syslinux packages..."
     mkdir -p "${BUILD_DIR}/config/archives"
-    echo "deb [trusted=yes] file://${DUMMY_REPO_IN_CHROOT} ./" \
-        > "${BUILD_DIR}/config/archives/blinbuntu-dummy-syslinux.list.chroot"
-    echo "deb [trusted=yes] file://${DUMMY_REPO_IN_CHROOT} ./" \
-        > "${BUILD_DIR}/config/archives/blinbuntu-dummy-syslinux.list.binary"
+    echo "deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse" \
+        > "${BUILD_DIR}/config/archives/ubuntu-noble-fallback.list.chroot"
+    echo "deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse" \
+        > "${BUILD_DIR}/config/archives/ubuntu-noble-fallback.list.binary"
+
+    # Pin resolute packages above noble so we don't accidentally downgrade anything
+    mkdir -p "${BUILD_DIR}/config/includes.chroot/etc/apt/preferences.d"
+    cat > "${BUILD_DIR}/config/includes.chroot/etc/apt/preferences.d/pin-resolute.pref" << 'PINFIX'
+Package: *
+Pin: release n=resolute
+Pin-Priority: 900
+
+Package: *
+Pin: release n=noble
+Pin-Priority: 100
+PINFIX
 }
 
 # Apply custom configuration
