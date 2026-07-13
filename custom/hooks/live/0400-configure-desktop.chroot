@@ -176,6 +176,21 @@ PROFILE
 # Ensure MATE panel has accessibility launcher
 mkdir -p /usr/share/mate-panel/applets
 
+# ── Cthulhu Autostart on Desktop Login ───────────────────────────────────────
+mkdir -p /etc/xdg/autostart
+cat > /etc/xdg/autostart/blinbuntu-cthulhu.desktop << 'CTHULHU'
+[Desktop Entry]
+Type=Application
+Name=Cthulhu Screenreader
+Comment=Starts Cthulhu screenreader automatically
+Exec=bash -c 'command -v cthulhu && cthulhu'
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+X-MATE-Autostart-enabled=true
+Terminal=false
+CTHULHU
+
 # ── Disable Orca autostart, prefer Cthulhu ───────────────────────────────────
 mkdir -p /etc/xdg/autostart
 cat > /etc/xdg/autostart/orca-autostart.desktop << 'ORCA'
