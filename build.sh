@@ -465,13 +465,13 @@ build_iso() {
     LB_BOOTLOADERS="grub-efi bios" lb build 2>&1 | tee "${SCRIPT_DIR}/build.log"
     ok "Build complete."
 
-    # Create version-agnostic symlinks in casper/ for isolinux/grub configs
+    # Create version-agnostic copies in casper/ for isolinux/grub configs
     if [ -d "${BUILD_DIR}/binary/casper" ]; then
         cd "${BUILD_DIR}/binary/casper"
-        for vk in vmlinuz-*generic; do [ -f "$vk" ] && ln -sf "$vk" vmlinuz 2>/dev/null && break; done
-        for ik in initrd.img-*generic; do [ -f "$ik" ] && ln -sf "$ik" initrd.img 2>/dev/null && break; done
+        for vk in vmlinuz-*generic; do [ -f "$vk" ] && cp -f "$vk" vmlinuz 2>/dev/null && break; done
+        for ik in initrd.img-*generic; do [ -f "$ik" ] && cp -f "$ik" initrd.img 2>/dev/null && break; done
         cd "${BUILD_DIR}"
-        ok "Created version-agnostic symlinks in binary/casper/"
+        ok "Created version-agnostic copies in binary/casper/"
     fi
 
     # Find the ISO lb build created (exclude chroot)
