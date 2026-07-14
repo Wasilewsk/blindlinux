@@ -52,7 +52,7 @@ build() {
 
     info "Building Blind Linux ISO (Fedora ${FEDORA_RELEASE})..."
     livecd-creator \
-        --file-config="${KS_FILE}" \
+        --config="${KS_FILE}" \
         --fslabel="${ISO_LABEL}" \
         --title="Blind Linux" \
         --project="Blind Linux - Accessible Linux" \
