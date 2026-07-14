@@ -3,13 +3,13 @@
 # and accessibility-first design.
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Use liveuser as the default user
-liveuser --name=blindlinux --fullname="Blind Linux" --is-admin
-
 # Locale and keyboard
 lang en_US.UTF-8
 keyboard --vckeymap=us
 timezone UTC
+
+# Root password (disabled for live)
+rootpw --plaintext --lock blindlinux
 
 # Network
 network --bootproto=dhcp --activate --onboot=on --hostname=blindlinux
@@ -109,6 +109,10 @@ curl
 set -e
 
 echo "=== Blind Linux post-install ==="
+
+# Create live user
+useradd -c "Blind Linux User" -G wheel -m blindlinux
+passwd -d blindlinux > /dev/null
 
 # Enable autologin
 mkdir -p /etc/sddm.conf.d
