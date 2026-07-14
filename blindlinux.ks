@@ -8,6 +8,10 @@ lang en_US.UTF-8
 keyboard --vckeymap=us
 timezone UTC
 
+# Repository
+repo --name=fedora --baseurl=https://dl.fedoraproject.org/pub/fedora/linux/releases/44/Everything/x86_64/os/
+repo --name=updates --baseurl=https://dl.fedoraproject.org/pub/fedora/linux/updates/44/Everything/x86_64/
+
 # Root password (disabled for live)
 rootpw --plaintext --lock blindlinux
 
