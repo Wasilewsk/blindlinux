@@ -139,12 +139,26 @@ setup_build() {
     # Create minimal live.cfg for isolinux
     cat > "${BUILD_DIR}/binary/isolinux/live.cfg" << 'LIVECFG'
 DEFAULT live
-MENU LABEL ^Live
+MENU TITLE Blinbuntu
+TIMEOUT 50
+
 LABEL live
   MENU LABEL ^Live - Try Blinbuntu without installing
   LINUX /casper/vmlinuz
   INITRD /casper/initrd.img
   APPEND boot=live components quiet splash
+
+LABEL live-nomodeset
+  MENU LABEL ^Live - Try Blinbuntu without installing (safe graphics)
+  LINUX /casper/vmlinuz
+  INITRD /casper/initrd.img
+  APPEND boot=live components quiet splash nomodeset
+
+LABEL install
+  MENU LABEL ^Install Blinbuntu
+  LINUX /casper/vmlinuz
+  INITRD /casper/initrd.img
+  APPEND boot=live components quiet splash preseed/file=/cdrom/preseed/blinbuntu.seed
 LIVECFG
 
     # Ensure isohybrid is findable everywhere (live-build may run binary.sh with restricted PATH)
@@ -237,7 +251,7 @@ done
 # Create syslinux.cfg (live.cfg equivalent for syslinux)
 cat > "${_SUFFIX}/syslinux.cfg" << 'SYSLINUXCFG'
 DEFAULT live
-TIMEOUT 0
+TIMEOUT 50
 PROMPT 0
 
 LABEL live
@@ -245,6 +259,12 @@ LABEL live
   LINUX /casper/vmlinuz
   INITRD /casper/initrd.img
   APPEND boot=live components quiet splash
+
+LABEL live-nomodeset
+  MENU LABEL ^Live - Try Blinbuntu without installing (safe graphics)
+  LINUX /casper/vmlinuz
+  INITRD /casper/initrd.img
+  APPEND boot=live components quiet splash nomodeset
 
 LABEL live-install
   MENU LABEL ^Install Blinbuntu
