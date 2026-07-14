@@ -251,7 +251,7 @@ LABEL live-install
   LINUX /casper/vmlinuz
   INITRD /casper/initrd.img
   APPEND boot=live components quiet splash preseed/file=/cdrom/preseed/blinbuntu.seed
-SYSLINUXSCRIPT
+SYSLINUXCFG
     chmod +x /usr/lib/live/build/lb_binary_syslinux
 
     # Replace lb_binary_grub2 to create proper EFI boot images for VMware UEFI.

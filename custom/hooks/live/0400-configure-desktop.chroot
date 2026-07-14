@@ -78,17 +78,8 @@ XKBOPTIONS="lv3:ralt_switch,compose:ralt"
 
 BACKSPACE="guess"
 KEYBOARD
-KEYBOARD
 
-# Console keyboard layout
-cat > /etc/default/keyboard << 'CONSOLE'
-# Console keymap
-XKBMODEL="pc105"
-XKBLAYOUT="us"
-XKBVARIANT=""
-XKBOPTIONS=""
-BACKSPACE="guess"
-CONSOLE
+# Note: console keymap is set by 0500-configure-keyboards.chroot
 
 # Set up console keymaps properly
 mkdir -p /etc/console-setup
