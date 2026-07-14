@@ -36,7 +36,6 @@ install_deps() {
         squashfs-tools \
         xorriso \
         syslinux \
-        isolinux \
         mtools \
         dosfstools \
         git \

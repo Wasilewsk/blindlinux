@@ -26,7 +26,6 @@ jobs:
             squashfs-tools \
             xorriso \
             syslinux \
-            isolinux \
             mtools \
             dosfstools \
             git \
