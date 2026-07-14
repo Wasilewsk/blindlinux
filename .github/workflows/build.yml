@@ -1,4 +1,4 @@
-name: Build Blinbuntu ISO
+name: Build Blind Linux ISO
 
 on:
   push:
@@ -7,33 +7,31 @@ on:
   pull_request:
     branches: [main, master]
   workflow_dispatch:
-    inputs:
-      ubuntu_codename:
-        description: 'Ubuntu codename (e.g. resolute, noble, jammy)'
-        required: false
-        default: 'resolute'
-      distro_version:
-        description: 'Distro version'
-        required: false
-        default: '26.04'
-      architecture:
-        description: 'Target architecture'
-        required: false
-        default: 'amd64'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    container:
+      image: fedora:44
+      options: --privileged
     timeout-minutes: 120
     permissions:
       contents: write
 
-    env:
-      UBUNTU_CODENAME: ${{ github.event.inputs.ubuntu_codename || 'resolute' }}
-      DISTRO_VERSION: ${{ github.event.inputs.distro_version || '26.04' }}
-      ARCHITECTURE: ${{ github.event.inputs.architecture || 'amd64' }}
-
     steps:
+      - name: Install dependencies
+        run: |
+          dnf install -y \
+            livecd-tools \
+            squashfs-tools \
+            xorriso \
+            syslinux \
+            isolinux \
+            mtools \
+            dosfstools \
+            git \
+            wget
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -43,27 +41,20 @@ jobs:
       - name: Get ISO filename
         id: iso
         run: |
-          ISO_FILE=$(find ./build -path ./build/chroot -prune -o -name "*.iso" -type f -print | head -1)
+          ISO_FILE=$(find . -maxdepth 1 -name "BlindLinux*.iso" -type f | head -1)
           if [ -z "${ISO_FILE}" ]; then
-            ISO_FILE=$(find . -path ./build/chroot -prune -o -name "*.iso" -type f -print | head -1)
+            echo "ERROR: No ISO file found"
+            ls -la
+            exit 1
           fi
           echo "ISO found: ${ISO_FILE}"
           echo "path=${ISO_FILE}" >> "$GITHUB_OUTPUT"
           echo "filename=$(basename "${ISO_FILE}")" >> "$GITHUB_OUTPUT"
 
-      - name: Generate checksums
-        run: |
-          ISO_PATH="${{ steps.iso.outputs.path }}"
-          sudo sha256sum "${ISO_PATH}" | sudo tee "${ISO_PATH}.sha256" > /dev/null
-
-      - name: Prepare ISO for upload
-        run: |
-          sudo chmod 644 "${{ steps.iso.outputs.path }}" "${{ steps.iso.outputs.path }}.sha256"
-
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
         with:
-          name: blinbuntu-${{ env.DISTRO_VERSION }}-${{ env.ARCHITECTURE }}
+          name: blindlinux-${{ github.sha }}
           path: |
             ${{ steps.iso.outputs.path }}
             ${{ steps.iso.outputs.path }}.sha256
@@ -78,12 +69,3 @@ jobs:
             ${{ steps.iso.outputs.path }}.sha256
           draft: true
           generate_release_notes: true
-
-  clean:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Clean build artifacts
-        run: sudo ./build.sh clean
