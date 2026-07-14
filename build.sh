@@ -55,8 +55,6 @@ build() {
         --config="${KS_FILE}" \
         --fslabel="${ISO_LABEL}" \
         --title="Blind Linux" \
-        --project="Blind Linux - Accessible Linux" \
-        --publisher="Blind Linux" \
         --releasever="${FEDORA_RELEASE}" \
         --no-virt \
         2>&1 | tee "${SCRIPT_DIR}/build.log"
