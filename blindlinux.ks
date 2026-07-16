@@ -90,6 +90,24 @@ dejavu-sans-fonts
 dejavu-serif-fonts
 google-noto-sans-fonts
 google-noto-serif-fonts
+
+# Installer
+anaconda
+%end
+
+# ─── Pre-Install: Copy assets from host into image ────────────────────────────
+%pre --erroronfail --log=/root/ks-pre.log
+mkdir -p $INSTALL_ROOT/usr/share/blindlinux
+mkdir -p $INSTALL_ROOT/usr/share/blindlinux/games
+mkdir -p $INSTALL_ROOT/tmp/blindlinux-sounds
+
+# Copy sounds from host into image
+cp /tmp/blindlinux-sounds/*.mp3 $INSTALL_ROOT/usr/share/blindlinux/ 2>/dev/null || true
+
+# Copy Porta-Bop
+cp "/tmp/Porta-Bop v3.0 linux.tar.gz" $INSTALL_ROOT/tmp/ 2>/dev/null || true
+
+echo "=== Pre-install complete ==="
 %end
 
 # ─── Post-Install ────────────────────────────────────────────────────────────
@@ -131,13 +149,10 @@ autologin-user=blindlinux
 autologin-session=mate
 EOM
 
-# Copy custom sounds
-mkdir -p /usr/share/blindlinux
-if [ -d "/tmp/blindlinux-sounds" ]; then
-    cp /tmp/blindlinux-sounds/*.mp3 /usr/share/blindlinux/ 2>/dev/null || true
-fi
+# Copy custom sounds (already copied by %pre)
+# Sounds are at /usr/share/blindlinux/
 
-# Install Porta-Bop game
+# Install Porta-Bop (already copied by %pre)
 if [ -f "/tmp/Porta-Bop v3.0 linux.tar.gz" ]; then
     mkdir -p /usr/share/blindlinux/games
     tar -xzf "/tmp/Porta-Bop v3.0 linux.tar.gz" -C /usr/share/blindlinux/games/ 2>/dev/null || true
@@ -158,6 +173,19 @@ echo "Sounds: /usr/share/blindlinux/"
 echo "Porta-Bop: /usr/share/blindlinux/games/"
 UTILITY
 chmod +x /usr/local/bin/blindlinux-welcome
+
+# Autostart livestart sound on login
+mkdir -p /etc/xdg/autostart
+cat > /etc/xdg/autostart/blindlinux-livestart.desktop << 'EOM'
+[Desktop Entry]
+Type=Application
+Name=Blind Linux Startup Sound
+Comment=Plays the startup sound
+Exec=bash -c 'sleep 2 && cvlc --play-and-exit --no-video /usr/share/blindlinux/livestart.mp3 2>/dev/null || true'
+Hidden=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true
+EOM
 
 # Enable graphical target
 systemctl set-default graphical.target
