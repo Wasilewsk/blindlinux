@@ -42,7 +42,7 @@ dracut-live
 @input-methods
 
 # Audio
-pulseaudio
+pipewire-pulseaudio
 pavucontrol
 alsa-utils
 
