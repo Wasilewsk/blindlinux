@@ -7,12 +7,11 @@ set -euo pipefail
 # ──────────────────────────────────────────────────────────────────────────────
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-KS_FILE="${SCRIPT_DIR}/blindlinux-en.ks"
+KS_FILE="${SCRIPT_DIR}/blindlinux.ks"
 ISO_NAME="blindlinux-44-x86_64.iso"
 TMPDIR="${SCRIPT_DIR}/live/tmp"
 FEDORA_RELEASE="44"
 
-# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -44,12 +43,6 @@ install_deps() {
     ok "Dependencies installed."
 }
 
-flatten_ks() {
-    info "Flattening kickstart files..."
-    ksflatten -c "${KS_FILE}" -o "${SCRIPT_DIR}/blindlinux-flat.ks"
-    ok "Flattened kickstart: blindlinux-flat.ks"
-}
-
 copy_assets() {
     info "Copying assets to staging area..."
     rm -rf /tmp/blindlinux-sounds
@@ -59,7 +52,6 @@ copy_assets() {
 }
 
 build() {
-    flatten_ks
     copy_assets
 
     info "Building Blind Linux ISO (Fedora ${FEDORA_RELEASE})..."
@@ -72,7 +64,7 @@ build() {
         --iso-name="${ISO_NAME}" \
         --project="Blind Linux" \
         --releasever="${FEDORA_RELEASE}" \
-        --ks="${SCRIPT_DIR}/blindlinux-flat.ks" \
+        --ks="${KS_FILE}" \
         --tmp="${TMPDIR}" \
         --anaconda-arg="--noselinux" \
         2>&1 | tee "${SCRIPT_DIR}/build.log"
@@ -91,7 +83,7 @@ build() {
 
 clean() {
     info "Cleaning build artifacts..."
-    rm -rf "${SCRIPT_DIR}/live" "${SCRIPT_DIR}/blindlinux-flat.ks" "${SCRIPT_DIR}/build.log"
+    rm -rf "${SCRIPT_DIR}/live" "${SCRIPT_DIR}/build.log"
     rm -f "${SCRIPT_DIR}/blindlinux-"*.iso "${SCRIPT_DIR}/blindlinux-"*.iso.sha256
     ok "Clean complete."
 }
