@@ -27,7 +27,7 @@ selinux --permissive
 # No bootloader needed for live ISO (ISOLINUX handles it)
 
 # Disk image (live ISO uses tmpfs)
-part / --size 4096 --fstype ext4 --ondisk=sda
+part / --size 8192 --fstype ext4 --ondisk=sda
 
 # ─── Packages ────────────────────────────────────────────────────────────────
 %packages
